@@ -15,18 +15,18 @@ setup(
     zip_safe=True,
     maintainer='jawad',
     maintainer_email='jawad@todo.todo',
-    description='TODO: Package description',
+    description='Drone control nodes for the ROS 2 PX4 Gazebo project',
     license='TODO: License declaration',
     extras_require={
         'test': [
             'pytest',
         ],
     },
-entry_points={
-    'console_scripts': [
-        'test_node = drone_control.test_node:main',
-        'command_publisher = drone_control.command_publisher:main',
-        'command_listener = drone_control.command_listener:main',
-    ],
-},
+    entry_points={
+        'console_scripts': [
+            'test_node = drone_control.test_node:main',
+            'command_publisher = drone_control.command_publisher:main',
+            'command_listener = drone_control.command_listener:main',
+        ],
+    },
 )
