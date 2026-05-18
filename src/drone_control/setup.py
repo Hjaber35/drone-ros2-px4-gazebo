@@ -23,10 +23,12 @@ setup(
         ],
     },
     entry_points={
-        'console_scripts': [
-            'test_node = drone_control.test_node:main',
-            'command_publisher = drone_control.command_publisher:main',
-            'command_listener = drone_control.command_listener:main',
+    'console_scripts': [
+        'test_node = drone_control.test_node:main',
+        'command_publisher = drone_control.command_publisher:main',
+        'command_listener = drone_control.command_listener:main',
+        'drone_state = drone_control.drone_state:main',
+        'position_listener = drone_control.position_listener:main',
         ],
     },
 )
