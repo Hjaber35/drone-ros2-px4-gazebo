@@ -29,6 +29,7 @@ setup(
         'command_listener = drone_control.command_listener:main',
         'drone_state = drone_control.drone_state:main',
         'position_listener = drone_control.position_listener:main',
+        'px4_status_listener = drone_control.px4_status_listener:main',
         ],
     },
 )
