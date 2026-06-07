@@ -30,6 +30,7 @@ setup(
         'drone_state = drone_control.drone_state:main',
         'position_listener = drone_control.position_listener:main',
         'px4_status_listener = drone_control.px4_status_listener:main',
+        'px4_odometry_listener = drone_control.px4_odometry_listener:main',
         ],
     },
 )
