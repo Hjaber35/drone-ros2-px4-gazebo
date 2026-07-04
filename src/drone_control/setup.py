@@ -31,6 +31,7 @@ setup(
         'position_listener = drone_control.position_listener:main',
         'px4_status_listener = drone_control.px4_status_listener:main',
         'px4_odometry_listener = drone_control.px4_odometry_listener:main',
+        'px4_offboard_takeoff = drone_control.px4_offboard_takeoff:main',
         ],
     },
 )
