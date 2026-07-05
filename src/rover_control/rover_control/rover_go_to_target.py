@@ -26,6 +26,7 @@ class RoverGoToTarget(Node):
         self.current_y = 0.0
         self.current_yaw = 0.0
         self.has_odom = False
+        self.target_reached = False
 
         self.timer = self.create_timer(0.1, self.control_loop)
 
@@ -60,20 +61,23 @@ class RoverGoToTarget(Node):
 
         cmd = Twist()
 
-       if distance < 0.25:
+        if distance < 0.35:
             cmd.linear.x = 0.0
             cmd.angular.z = 0.0
             self.cmd_pub.publish(cmd)
-            self.get_logger().info('Target reached. Rover stopped.')
+
+            if not self.target_reached:
+                self.get_logger().info('Target reached. Rover stopped.')
+                self.target_reached = True
+
             return
 
-        if abs(angle_error) > 0.2:
+        if abs(angle_error) > 0.25:
             cmd.linear.x = 0.0
-            cmd.angular.z = 0.8 * angle_error
+            cmd.angular.z = max(min(0.5 * angle_error, 0.6), -0.6)
         else:
-    # Slow down as we get closer to the target
-    cmd.linear.x = min(0.25, 0.4 * distance)
-    cmd.angular.z = 0.8 * angle_error
+            cmd.linear.x = min(0.12, 0.25 * distance)
+            cmd.angular.z = max(min(0.5 * angle_error, 0.4), -0.4)
 
         self.cmd_pub.publish(cmd)
 
