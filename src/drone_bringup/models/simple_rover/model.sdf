@@ -101,7 +101,7 @@
       <parent>base_link</parent>
       <child>left_wheel</child>
       <axis>
-        <xyz>0 0 1</xyz>
+        <xyz>0 0 -1</xyz>
       </axis>
     </joint>
 
@@ -109,7 +109,7 @@
       <parent>base_link</parent>
       <child>right_wheel</child>
       <axis>
-        <xyz>0 0 1</xyz>
+        <xyz>0 0 -1</xyz>
       </axis>
     </joint>
 
