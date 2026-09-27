@@ -20,6 +20,8 @@ The original drone/PX4 work is preserved. Active rover development is on the `ro
 - Green target marker in Gazebo
 - Blue chassis with a yellow stripe identifying the front
 - One launch command for Gazebo, the ROS/Gazebo bridge, and the controller
+- Controller timing synchronized with Gazebo through `/clock`
+- Diagonal target navigation verified in two consecutive runs
 
 ## How It Works
 
@@ -78,7 +80,7 @@ Press Ctrl+C in the launch terminal to stop the demo.
 
 ## Current Target
 
-- Target: `x = 2.0 m`, `y = 0.0 m` in the odometry frame
+- Target: `x = 2.0 m`, `y = -2.0 m` in the odometry frame
 - Stopping tolerance: `0.35 m`
 
 Target coordinates are defined in:
@@ -89,7 +91,7 @@ The target marker is defined separately in:
 
 `src/drone_bringup/worlds/simple_room.sdf`
 
-For the current starting pose, the marker is placed at world coordinates `(2, 0)`. If changing the target, update the marker to match.
+For the current starting pose, the marker is placed at world coordinates `(2, -2)`. If changing the target, update the marker to match.
 
 ## Main Files
 
@@ -105,7 +107,7 @@ For the current starting pose, the marker is placed at world coordinates `(2, 0)
 - The route to the target must be clear; obstacle avoidance is not implemented.
 - Wheel-based odometry can drift or report inaccurate movement if wheels slip.
 - The target is currently set in code.
-- The current demonstrated test is a straight drive to `(2, 0)`. Turning to other targets still needs validation.
+- Straight-line navigation to `(2, 0)` and diagonal navigation to `(2, -2)` have been demonstrated. The diagonal test succeeded in two consecutive runs; broader testing is still needed.
 - Rover navigation does not currently use LiDAR, SLAM, or camera-based perception.
 
 ## Original PX4 Drone Work

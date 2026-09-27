@@ -21,7 +21,7 @@ class RoverGoToTarget(Node):
         )
 
         self.target_x = 2.0
-        self.target_y = 0.0
+        self.target_y = -2.0
 
         self.current_x = 0.0
         self.current_y = 0.0

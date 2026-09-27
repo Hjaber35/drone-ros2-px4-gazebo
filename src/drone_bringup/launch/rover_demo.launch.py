@@ -18,9 +18,10 @@ def generate_launch_description():
     )
 
     gazebo = ExecuteProcess(
-        cmd=["gz", "sim", world_path],
+        cmd=["gz", "sim", "-r", world_path],
         output="screen",
     )
+
 
     bridge = Node(
         package="ros_gz_bridge",
@@ -28,6 +29,7 @@ def generate_launch_description():
         arguments=[
             "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
             "/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry",
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
         ],
         output="screen",
     )
@@ -35,6 +37,7 @@ def generate_launch_description():
     rover = Node(
         package="rover_control",
         executable="rover_go_to_target",
+        parameters=[{"use_sim_time": True}],
         output="screen",
     )
 
