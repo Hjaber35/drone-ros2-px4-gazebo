@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from rclpy.executors import ExternalShutdownException
 
 
 class RoverGoToTarget(Node):
@@ -37,6 +38,7 @@ class RoverGoToTarget(Node):
         self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
 
+        # Convert the odometry quaternion into yaw (heading in radians).
         q = msg.pose.pose.orientation
 
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
@@ -47,9 +49,12 @@ class RoverGoToTarget(Node):
 
     def control_loop(self):
         if not self.has_odom:
-            self.get_logger().info('Waiting for odometry...')
+            self.get_logger().info(
+                'Waiting for odometry...',
+                throttle_duration_sec=2.0,
+            )            
             return
-
+        # Calculate the remaining displacement to the target in metres.
         dx = self.target_x - self.current_x
         dy = self.target_y - self.current_y
 
@@ -57,6 +62,7 @@ class RoverGoToTarget(Node):
         target_angle = math.atan2(dy, dx)
 
         angle_error = target_angle - self.current_yaw
+        # Wrap the heading error to [-pi, pi] for the shorter turn.
         angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
 
         cmd = Twist()
@@ -83,13 +89,20 @@ class RoverGoToTarget(Node):
 
         self.get_logger().info(
             f'x={self.current_x:.2f}, y={self.current_y:.2f}, '
-            f'distance={distance:.2f}, angle_error={angle_error:.2f}'
+            f'distance={distance:.2f}, angle_error={angle_error:.2f}',
+            throttle_duration_sec=1.0,
         )
+        
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = RoverGoToTarget()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
