@@ -1,5 +1,7 @@
 import math
-
+import time
+from sensor_msgs.msg import LaserScan
+from rclpy.qos import qos_profile_sensor_data
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -28,7 +30,15 @@ class RoverGoToTarget(Node):
         self.current_yaw = 0.0
         self.has_odom = False
         self.target_reached = False
-
+        self.front_distance = None
+        self.last_scan_time = None
+        self.obstacle_stop_distance = 0.8
+        self.scan_sub = self.create_subscription(
+            LaserScan,
+            '/scan',
+            self.scan_callback,
+            qos_profile_sensor_data,
+        )
         self.timer = self.create_timer(0.1, self.control_loop)
 
         self.get_logger().info('Autonomous rover target node started.')
@@ -46,8 +56,51 @@ class RoverGoToTarget(Node):
         self.current_yaw = math.atan2(siny_cosp, cosy_cosp)
 
         self.has_odom = True
+    def scan_callback(self, msg):
+        front_ranges = []
 
+        for index, distance in enumerate(msg.ranges):
+            angle = msg.angle_min + index * msg.angle_increment
+
+            # Examine only the 30 degrees on either side of forward.
+            if abs(angle) <= math.radians(30):
+                if distance == math.inf:
+                    # Gazebo reports +inf when nothing is within range.
+                    front_ranges.append(msg.range_max)
+                elif math.isfinite(distance) and (
+                    msg.range_min <= distance <= msg.range_max
+                ):
+                    front_ranges.append(distance)
+                else:
+                    # Invalid forward readings: wait for a usable scan.
+                    self.front_distance = None
+                    self.last_scan_time = time.monotonic()
+                    return
+
+        self.front_distance = min(front_ranges) if front_ranges else None
+        self.last_scan_time = time.monotonic()
     def control_loop(self):
+        scan_missing = (
+            self.last_scan_time is None
+            or time.monotonic() - self.last_scan_time > 1.0
+            or self.front_distance is None
+        )
+
+        if scan_missing:
+            self.cmd_pub.publish(Twist())
+            self.get_logger().info(
+                'Waiting for fresh, valid LiDAR data...',
+                throttle_duration_sec=2.0,
+            )
+            return
+
+        if self.front_distance < self.obstacle_stop_distance:
+            self.cmd_pub.publish(Twist())
+            self.get_logger().info(
+                f'Obstacle ahead: {self.front_distance:.2f} m. Stopped.',
+                throttle_duration_sec=2.0,
+            )
+            return
         if not self.has_odom:
             self.get_logger().info(
                 'Waiting for odometry...',
@@ -82,7 +135,7 @@ class RoverGoToTarget(Node):
             cmd.linear.x = 0.0
             cmd.angular.z = max(min(0.5 * angle_error, 0.6), -0.6)
         else:
-            cmd.linear.x = min(0.12, 0.25 * distance)
+            cmd.linear.x = min(0.25, 0.25 * distance)
             cmd.angular.z = max(min(0.5 * angle_error, 0.4), -0.4)
 
         self.cmd_pub.publish(cmd)

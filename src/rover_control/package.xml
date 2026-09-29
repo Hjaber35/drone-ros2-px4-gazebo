@@ -6,6 +6,8 @@
   <description>TODO: Package description</description>
   <maintainer email="Jhcjaber@hotmail.com">jawad</maintainer>
   <license>TODO: License declaration</license>
+  <exec_depend>sensor_msgs</exec_depend>
+
 
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>

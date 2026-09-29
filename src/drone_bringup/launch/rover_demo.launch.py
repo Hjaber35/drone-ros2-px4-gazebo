@@ -18,7 +18,13 @@ def generate_launch_description():
     )
 
     gazebo = ExecuteProcess(
-        cmd=["gz", "sim", "-r", world_path],
+        cmd=[
+            "gz", "sim", "-r", "-v", "4",
+            "--render-engine-gui", "ogre",
+            "--render-engine-server", "ogre2",
+            world_path,
+        ],
+        additional_env={"GALLIUM_DRIVER": "d3d12"},
         output="screen",
     )
 
@@ -30,6 +36,7 @@ def generate_launch_description():
             "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
             "/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry",
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
         ],
         output="screen",
     )
