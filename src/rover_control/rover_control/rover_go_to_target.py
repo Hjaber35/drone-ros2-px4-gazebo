@@ -33,6 +33,12 @@ class RoverGoToTarget(Node):
         self.front_distance = None
         self.last_scan_time = None
         self.obstacle_stop_distance = 0.8
+        # Remember which part of the detour we are performing.
+        self.mode = 'GO_TO_TARGET'
+        self.detour_yaw = 0.0
+        self.detour_start_x = 0.0
+        self.detour_start_y = 0.0
+        self.detour_distance = 1.2
         self.scan_sub = self.create_subscription(
             LaserScan,
             '/scan',
@@ -94,10 +100,10 @@ class RoverGoToTarget(Node):
             )
             return
 
-        if self.front_distance < self.obstacle_stop_distance:
+        if not self.has_odom:
             self.cmd_pub.publish(Twist())
             self.get_logger().info(
-                f'Obstacle ahead: {self.front_distance:.2f} m. Stopped.',
+                'Waiting for odometry...',
                 throttle_duration_sec=2.0,
             )
             return
@@ -106,6 +112,80 @@ class RoverGoToTarget(Node):
                 'Waiting for odometry...',
                 throttle_duration_sec=2.0,
             )            
+            return
+        # Begin a detour when an obstacle blocks forward travel.
+        if (
+            self.mode == 'GO_TO_TARGET'
+            and self.front_distance < self.obstacle_stop_distance
+        ):
+            self.mode = 'TURN_LEFT'
+
+            # Turn 60 degrees left from the current heading.
+            self.detour_yaw = self.current_yaw + math.radians(60)
+            self.detour_yaw = math.atan2(
+                math.sin(self.detour_yaw),
+                math.cos(self.detour_yaw),
+            )
+
+            self.cmd_pub.publish(Twist())
+            self.get_logger().info('Obstacle detected. Turning left.')
+            return
+
+        if self.mode == 'TURN_LEFT':
+            turn_error = self.detour_yaw - self.current_yaw
+            turn_error = math.atan2(
+                math.sin(turn_error), math.cos(turn_error)
+            )
+
+            cmd = Twist()
+
+            # Stop the turn once we are within about 5 degrees.
+            if abs(turn_error) < 0.08:
+                self.detour_start_x = self.current_x
+                self.detour_start_y = self.current_y
+                self.mode = 'PASS_OBSTACLE'
+                self.get_logger().info(
+                    'Turn complete. Driving along the detour.'
+                )
+            else:
+                cmd.angular.z = max(min(0.8 * turn_error, 0.5), -0.5)
+
+            self.cmd_pub.publish(cmd)
+            return
+
+        if self.mode == 'PASS_OBSTACLE':
+            travelled = math.hypot(
+                self.current_x - self.detour_start_x,
+                self.current_y - self.detour_start_y,
+            )
+
+            cmd = Twist()
+
+            if travelled >= self.detour_distance:
+                self.mode = 'GO_TO_TARGET'
+                self.get_logger().info(
+                    'Detour complete. Returning toward the target.'
+                )
+            elif self.front_distance < self.obstacle_stop_distance:
+                self.get_logger().info(
+                    'Detour path blocked. Waiting.',
+                    throttle_duration_sec=2.0,
+                )
+            else:
+                heading_error = self.detour_yaw - self.current_yaw
+                heading_error = math.atan2(
+                    math.sin(heading_error), math.cos(heading_error)
+                )
+
+                # Correct the heading before moving forward.
+                if abs(heading_error) < 0.15:
+                    cmd.linear.x = 0.12
+
+                cmd.angular.z = max(
+                    min(0.8 * heading_error, 0.4), -0.4
+                )
+
+            self.cmd_pub.publish(cmd)
             return
         # Calculate the remaining displacement to the target in metres.
         dx = self.target_x - self.current_x
