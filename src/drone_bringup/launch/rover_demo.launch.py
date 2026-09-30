@@ -2,13 +2,28 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, SetEnvironmentVariable
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    SetEnvironmentVariable,
+)
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     package_share = get_package_share_directory("drone_bringup")
-    world_path = os.path.join(package_share, "worlds", "simple_room.sdf")
+    world_argument = DeclareLaunchArgument(
+        "world",
+        default_value="simple_room.sdf",
+        description="World file inside drone_bringup/worlds",
+    )
+
+    world_path = PathJoinSubstitution([
+        package_share,
+        "worlds",
+        LaunchConfiguration("world"),
+    ])
 
     # Keep using the model folder from our working demo.
     models_path = os.path.expanduser("~/drone_ws/src/drone_bringup/models")
@@ -49,6 +64,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        world_argument,
         SetEnvironmentVariable(
             name="GZ_SIM_RESOURCE_PATH",
             value=resource_path,
