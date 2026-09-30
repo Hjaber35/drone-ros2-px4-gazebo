@@ -193,7 +193,7 @@
 
     <model name="center_obstacle">
       <static>true</static>
-      <pose>1 -1 0.5 0 0 0</pose>
+      <pose>1 1 0.5 0 0 0</pose>
       <link name="center_obstacle_link">
         <collision name="center_obstacle_collision">
           <geometry>
@@ -220,10 +220,10 @@
   <uri>model://simple_rover</uri>
   <pose>0 0 0 0 0 0</pose>
 </include>
-    <!-- Green target area at x=2, y=-2 -->
+    <!-- Green target area at x=2, y=2 -->
     <model name="target_marker">
       <static>true</static>
-      <pose>2 -2 0.065 0 0 0</pose>
+      <pose>2 2 0.065 0 0 0</pose>
 
       <link name="marker_link">
         <visual name="marker_visual">
