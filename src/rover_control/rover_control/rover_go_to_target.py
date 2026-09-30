@@ -38,7 +38,9 @@ class RoverGoToTarget(Node):
         self.detour_yaw = 0.0
         self.detour_start_x = 0.0
         self.detour_start_y = 0.0
-        self.detour_distance = 1.2
+        self.detour_distance = 1.8
+        self.latest_scan = None
+        self.clearance_radius = 0.50
         self.scan_sub = self.create_subscription(
             LaserScan,
             '/scan',
@@ -63,6 +65,7 @@ class RoverGoToTarget(Node):
 
         self.has_odom = True
     def scan_callback(self, msg):
+        self.latest_scan = msg
         front_ranges = []
 
         for index, distance in enumerate(msg.ranges):
@@ -85,6 +88,70 @@ class RoverGoToTarget(Node):
 
         self.front_distance = min(front_ranges) if front_ranges else None
         self.last_scan_time = time.monotonic()
+    def target_path_clear(self):
+        scan = self.latest_scan
+        if scan is None or not self.has_odom:
+            return False
+
+        # Require a complete scan around the rover.
+        if (
+            not scan.ranges
+            or scan.angle_increment <= 0.0
+            or scan.angle_max - scan.angle_min
+            < 2 * math.pi - 2 * scan.angle_increment
+        ):
+            return False
+
+        dx = self.target_x - self.current_x
+        dy = self.target_y - self.current_y
+        path_length = math.hypot(dx, dy)
+
+        target_direction = math.atan2(dy, dx) - self.current_yaw
+        radius = self.clearance_radius
+
+        # Do not declare a route clear beyond the sensor's range.
+        if path_length + radius > scan.range_max:
+            return False
+
+        for index, distance in enumerate(scan.ranges):
+            if distance == math.inf:
+                continue
+
+            if (
+                not math.isfinite(distance)
+                or distance < scan.range_min
+                or distance > scan.range_max
+            ):
+                self.get_logger().info(
+                    f'Clearance check: invalid scan reading {distance}',
+                    throttle_duration_sec=2.0,
+                )
+                return False
+
+            angle = scan.angle_min + index * scan.angle_increment
+            relative_angle = angle - target_direction
+
+            # Locate the detected point relative to the target route.
+            along = distance * math.cos(relative_angle)
+            sideways = distance * math.sin(relative_angle)
+
+            # Find the closest point on the route to this detection.
+            nearest_along = max(0.0, min(path_length, along))
+            distance_to_path = math.hypot(
+                along - nearest_along,
+                sideways,
+            )
+
+            if distance_to_path <= radius:
+                self.get_logger().info(
+                    f'Clearance blocked: range={distance:.2f} m, '
+                    f'angle={math.degrees(angle):.1f} deg, '
+                    f'distance from target route={distance_to_path:.2f} m',
+                    throttle_duration_sec=2.0,
+                )
+                return False
+
+        return True
     def control_loop(self):
         scan_missing = (
             self.last_scan_time is None
@@ -106,12 +173,6 @@ class RoverGoToTarget(Node):
                 'Waiting for odometry...',
                 throttle_duration_sec=2.0,
             )
-            return
-        if not self.has_odom:
-            self.get_logger().info(
-                'Waiting for odometry...',
-                throttle_duration_sec=2.0,
-            )            
             return
         # Begin a detour when an obstacle blocks forward travel.
         if (
@@ -161,10 +222,17 @@ class RoverGoToTarget(Node):
 
             cmd = Twist()
 
-            if travelled >= self.detour_distance:
+            if travelled >= 0.25 and self.target_path_clear():
                 self.mode = 'GO_TO_TARGET'
                 self.get_logger().info(
-                    'Detour complete. Returning toward the target.'
+                    f'Target passage clear after {travelled:.2f} m. '
+                    'Returning toward the target.'
+                )
+            elif travelled >= self.detour_distance:
+                self.get_logger().info(
+                    'Detour limit reached, but target passage is blocked. '
+                    'Stopped.',
+                    throttle_duration_sec=2.0,
                 )
             elif self.front_distance < self.obstacle_stop_distance:
                 self.get_logger().info(
