@@ -1,58 +1,33 @@
-# Autonomous Rover Simulation — ROS 2 + Gazebo
+# Autonomous Rover Simulation
 
-A differential-drive rover that navigates toward a target using odometry and simulated 360° LiDAR. It compares left and right detours when an obstacle blocks forward travel, checks clearance before returning toward the target, and stops near the goal.
+A differential-drive rover project built with ROS 2 Jazzy and Gazebo Harmonic. The rover uses a simulated LiDAR to sense the room. I used SLAM Toolbox to create a map, then saved it so the rover can localize with AMCL and drive to a goal selected in RViz using Nav2.
 
-Developed using ROS 2 Jazzy and Gazebo Harmonic on Ubuntu 24.04 through Windows WSL.
+The project runs in Ubuntu 24.04 through WSL on Windows.
 
-## Project Background
+## Why this project changed
 
-This project began as a ROS 2 and PX4 drone simulation. I switched active development to a rover to build a manageable autonomous navigation project and strengthen my understanding of ROS nodes, simulation, sensors, and feedback control.
+This repository started as a PX4 drone project. I switched my active work to a rover so I could focus on a reliable autonomous navigation demo. The earlier drone work is still in the repository; rover development is on the `rover-version` branch.
 
-The original drone/PX4 work is preserved. Active rover development is on the `rover-version` branch.
+## What works
 
-## Implemented Features
+- A differential-drive rover drives in a Gazebo room with walls and obstacles.
+- A simulated 360° LiDAR publishes scans on `/scan`.
+- SLAM Toolbox was used to make and save a map of the room.
+- AMCL estimates the rover's position on the saved map.
+- Nav2 plans a path to a goal chosen in RViz and uses LiDAR data to avoid obstacles.
+- An earlier Python controller can drive to a fixed target and choose a left or right detour using the LiDAR scan.
 
-- Differential-drive rover with a blue chassis and yellow front stripe
-- Autonomous navigation toward a fixed coordinate target
-- Odometry-based heading correction and reduced speed near the target
-- Simulated 360° LiDAR publishing distance readings on `/scan`
-- Comparison of left and right 60° detour candidates
-- Clearance checks that account for the rover's size
-- Return toward the target when the scanned passage is clear
-- Stopping when neither candidate detour has sufficient clearance
-- Stopping when LiDAR data is missing, stale, or invalid in the forward sector
-- Green target marker in Gazebo
-- One launch command for Gazebo, the bridge, and the controller
-- Selectable normal and blocked-path test worlds
-- Controller timers use simulation time through `/clock`
+The Nav2 route and the earlier Python controller are separate ways of driving the rover. Run only one at a time because both can publish movement commands.
 
-## How It Works
+## How navigation works
 
-1. Gazebo simulates the rover, odometry, and LiDAR.
-2. `ros_gz_bridge` connects Gazebo topics to ROS 2.
-3. `rover_go_to_target` reads `/odom` and `/scan`.
-4. With a clear forward path, it calculates target distance and heading error.
-5. When an obstacle is detected ahead, it compares left and right detours.
-6. It turns toward an eligible detour and drives slowly while checking the passage toward the target.
-7. When that passage has sufficient clearance, it resumes target navigation.
-8. It publishes movement commands on `/cmd_vel` and stops within the target tolerance.
+Gazebo simulates the rover, its wheel odometry, and its LiDAR. `ros_gz_bridge` passes the simulation topics into ROS 2. SLAM Toolbox combined the LiDAR scans with the rover's movement to build the saved map. During a navigation run, AMCL estimates where the rover is on that map, and Nav2 plans and follows a route to the goal selected in RViz.
 
-The controller represents the rover with a clearance circle when checking candidate paths. These checks use the current scan, not a stored map.
+The green circle in Gazebo marks the earlier controller's fixed target. Nav2 follows the goal selected in RViz; it does not read the green circle.
 
-The green marker only displays the target area. The rover follows numerical coordinates; it does not detect the marker with a camera.
+## Setup and build
 
-## Environment
-
-- Windows with WSL Ubuntu 24.04
-- ROS 2 Jazzy
-- Gazebo Harmonic
-- `ros_gz_bridge`
-- Python
-- colcon
-
-The commands below assume these dependencies are installed and the workspace is located at `~/drone_ws`.
-
-## Build
+These commands assume ROS 2 Jazzy, Gazebo Harmonic, `ros_gz_bridge`, Nav2, and the workspace are already installed at `~/drone_ws`.
 
 ```bash
 cd ~/drone_ws
@@ -62,7 +37,11 @@ colcon build --packages-select drone_bringup rover_control --symlink-install
 source install/setup.bash
 ```
 
-## Run the Normal Demo
+## Run navigation on the saved map
+
+Open three Ubuntu terminals. Keep each launch command running while you use the next terminal.
+
+**Terminal 1 — Gazebo and the bridge**
 
 ```bash
 cd ~/drone_ws
@@ -71,17 +50,37 @@ source install/setup.bash
 ros2 launch drone_bringup rover_demo.launch.py
 ```
 
-This loads `simple_room.sdf`. The current layout contains the central obstacle and a left-side blocker, providing a test of right-side avoidance.
+Make sure Gazebo is playing. This launch starts the room and bridges `/cmd_vel`, `/odom`, `/clock`, and `/scan`. It does not start the earlier Python controller.
 
-The launch file starts:
+**Terminal 2 — saved map, AMCL, and Nav2**
 
-- Gazebo
-- The bridge for `/cmd_vel`, `/odom`, `/clock`, and `/scan`
-- The `rover_go_to_target` controller
+```bash
+cd ~/drone_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_bringup rover_navigation.launch.py
+```
 
-The simulation is configured to start playing automatically.
+Give the navigation nodes a little time to become active.
 
-## Run the Blocked-Path Test
+**Terminal 3 — RViz**
+
+```bash
+cd ~/drone_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+GALLIUM_DRIVER=d3d12 rviz2 --ros-args -p use_sim_time:=true
+```
+
+In RViz, set **Fixed Frame** to `map`. If the map is missing, add a **Map** display, choose `/map`, and set its **Durability Policy** to **Transient Local**. Use **2D Pose Estimate** to show AMCL where the rover starts. Then use **2D Goal Pose** to select where Nav2 should drive. Check that the pose arrow points in the rover's actual direction.
+
+Stop a launch with Ctrl+C in its terminal. Let Gazebo close before starting another world.
+
+## Earlier controller and blocked-path test
+
+`rover_go_to_target` is the earlier controller in `rover_control`. It uses `/odom` to steer to `(2, 2)` and `/scan` to check possible left and right detours. It slows near the target and stops within 0.35 m. If neither detour has enough clearance, it stops. This is a simple reactive approach, not the Nav2 planner.
+
+To test the case where both detours are blocked, stop the Nav2 launch and any other controller. Start the blocked world in **Terminal 1**:
 
 ```bash
 cd ~/drone_ws
@@ -90,106 +89,64 @@ source install/setup.bash
 ros2 launch drone_bringup rover_demo.launch.py world:=blocked_paths.sdf
 ```
 
-This world adds a right-side blocker. The expected result is that the rover stops when both candidate detours are rejected.
+Then start the earlier controller in a **second Ubuntu terminal**:
 
-A stopped rover is the intended outcome of this test. It does not mean every possible route through the room is blocked.
+```bash
+cd ~/drone_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run rover_control rover_go_to_target --ros-args -p use_sim_time:=true
+```
 
-Stop the current demo with Ctrl+C and wait for Gazebo to close before launching another world.
+The expected result in this test is a stopped rover when both candidate detours are rejected. This does not mean that every possible route through the room is blocked.
 
-Do not run `rover_driver` alongside the autonomous controller because both publish movement commands to `/cmd_vel`.
+Do not run `rover_driver` at the same time as either navigation method; it also publishes to `/cmd_vel`.
 
-## Current Settings
-
-| Setting | Value |
-| --- | --- |
-| Target in the odometry frame | `(2.0, 2.0)` m |
-| Target stopping tolerance | 0.35 m |
-| Maximum target-driving speed | 0.25 m/s |
-| Detour driving speed | 0.12 m/s |
-| Forward obstacle threshold | 0.80 m from the LiDAR |
-| Forward detection sector | ±30° |
-| Candidate detour turns | ±60° |
-| Clearance radius | 0.50 m |
-| Minimum detour before checking for a return | 0.25 m |
-| Maximum detour displacement | 1.80 m |
-| LiDAR coverage | 360°, approximately 1° spacing |
-| LiDAR range and update rate | 0.10–8.0 m, 10 Hz |
-
-If both candidate paths are eligible and their clearance differs by no more than 0.05 m, the controller prefers left.
-
-Target coordinates are defined in:
-
-`src/rover_control/rover_control/rover_go_to_target.py`
-
-Target markers are defined separately in both world files. With the current starting pose, they are at world coordinates `(2, 2)`. Update both markers when changing the target.
-
-## Tests Performed
-
-- Navigation to straight and diagonal targets
-- Stopping for an obstacle ahead
-- Left-side obstacle detour and return to the target
-- Right-side detour with the left candidate blocked, reaching the target without touching either box
-- Rejection of both detours in the blocked-path layout
-- Launching the normal and blocked-path worlds using the `world` argument
-
-These are manual simulation tests in specific layouts. Broader repeatability testing is still needed.
-
-## Main Files
+## Main files
 
 | File | Purpose |
 | --- | --- |
-| `src/drone_bringup/launch/rover_demo.launch.py` | Starts the demo and selects the world |
-| `src/drone_bringup/worlds/simple_room.sdf` | Normal navigation test layout |
-| `src/drone_bringup/worlds/blocked_paths.sdf` | Both-detours-blocked test layout |
-| `src/drone_bringup/models/simple_rover/model.sdf` | Rover body, wheels, LiDAR, and drive plugin |
-| `src/rover_control/rover_control/rover_go_to_target.py` | Target navigation and reactive obstacle avoidance |
+| `src/drone_bringup/launch/rover_demo.launch.py` | Starts Gazebo and the ROS/Gazebo bridge |
+| `src/drone_bringup/launch/rover_navigation.launch.py` | Starts the saved map, AMCL, and Nav2 |
+| `src/drone_bringup/config/rover_nav.yaml` | Nav2 settings, including driving speed |
+| `src/drone_bringup/config/rover_mapping.yaml` | SLAM Toolbox settings used while mapping |
+| `src/drone_bringup/worlds/simple_room.sdf` | Main room and target marker |
+| `src/drone_bringup/worlds/blocked_paths.sdf` | Optional blocked-detour test |
+| `src/drone_bringup/models/simple_rover/model.sdf` | Rover, wheels, LiDAR, and drive plugin |
+| `src/rover_control/rover_control/rover_go_to_target.py` | Earlier fixed-target controller |
+| `maps/simple_room.pgm` and `maps/simple_room.yaml` | Saved room map |
 
-## Current Limitations
+## What has been tested
 
-- This is a reactive controller, not a global path planner.
-- It considers only two detour directions: 60° left and 60° right.
-- It may stop even when another route exists.
-- It stops if the detour limit is reached without a clear passage to the target.
-- LiDAR checks cannot reveal obstacles hidden behind other objects or outside the scan plane.
-- Current scan-based clearance checks do not guarantee collision-free motion in arbitrary or changing environments.
-- Wheel-based odometry can become inaccurate when wheels slip.
-- The target and tuning values are currently set in code.
-- SLAM, Nav2, and camera-based perception are not implemented.
+- Mapped the room with LiDAR and SLAM Toolbox, then saved the map.
+- Localized the rover on the saved map with AMCL.
+- Selected a goal in RViz and drove there with Nav2 while avoiding obstacles in the simulation room.
+- Launched Nav2 automatically using `rover_navigation.launch.py` with the configured 0.40 m/s forward speed limit.
+- Ran the earlier controller through left and right detours and checked that it stops when both detours are rejected.
 
-## Local WSL Setup Notes
+These are manual tests in this simulated room. The project has not been tested against every obstacle layout.
 
-The launch file currently finds models in:
+## Current limits and next steps
 
-`~/drone_ws/src/drone_bringup/models`
+- Nav2 uses a saved map; the initial pose is currently set manually in RViz.
+- Wheel odometry can drift, especially if the wheels slip.
+- The earlier controller checks two 60° detours and may stop even when another route exists.
+- The LiDAR only measures obstacles visible in its scan plane.
+- Camera-based perception is not part of this demo.
 
-Update that path if moving the workspace.
+Next I plan to repeat the navigation tests, capture screenshots and a short video, and write up the design, results, and limitations.
 
-The current graphics configuration uses Ogre for the GUI, Ogre2 for server-side sensors, and `GALLIUM_DRIVER=d3d12` for this WSL/Intel graphics setup. Other computers may require different graphics settings.
+## WSL notes
 
-During development, conflicting time synchronization caused large jumps in Ubuntu's system clock and jerky Gazebo display updates. Stopping Ubuntu's `systemd-timesyncd` service resolved the observed issue on this machine while Windows/WSL continued providing time synchronization.
+The Gazebo launch currently looks for rover models at `~/drone_ws/src/drone_bringup/models`. Update that path if the workspace moves. The `GALLIUM_DRIVER=d3d12` RViz command and Gazebo rendering settings were chosen for this WSL computer with Intel graphics and may need changing on another machine.
 
-## Original PX4 Drone Work
+## Earlier PX4 work
 
-Earlier milestones included:
+The initial drone milestones included installing ROS 2 and PX4, launching an x500 drone in Gazebo, and running basic Python ROS 2 nodes. Drone LiDAR, SLAM, and marker landing were ideas for later work, not completed drone features.
 
-- ROS 2 Jazzy and PX4 installation
-- Gazebo launch with the x500 drone
-- ROS 2 workspace creation
-- Initial Python ROS 2 nodes
-
-The original drone plan included LiDAR, SLAM, and ArUco marker landing. These were planned features, not completed drone capabilities.
-
-To launch the original PX4 simulation using the existing installation:
+The earlier PX4 installation can still be launched separately:
 
 ```bash
 cd ~/PX4-Autopilot
 make px4_sitl gz_x500
 ```
-
-## Next Steps
-
-- Repeat the existing tests and record results
-- Test additional obstacle positions and target locations
-- Improve recovery when the current detour choices are blocked
-- Add screenshots and a short demonstration video
-- Prepare a project report explaining the design, tests, and limitations
