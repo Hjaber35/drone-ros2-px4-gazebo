@@ -47,7 +47,7 @@ Open three Ubuntu terminals. Keep each launch command running while you use the 
 cd ~/drone_ws
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 launch drone_bringup rover_demo.launch.py
+ros2 launch drone_bringup rover_showcase.launch.py
 ```
 
 Make sure Gazebo is playing. This launch starts the room and bridges `/cmd_vel`, `/odom`, `/clock`, and `/scan`. It does not start the earlier Python controller.
@@ -106,15 +106,15 @@ Do not run `rover_driver` at the same time as either navigation method; it also 
 
 | File | Purpose |
 | --- | --- |
-| `src/drone_bringup/launch/rover_demo.launch.py` | Starts Gazebo and the ROS/Gazebo bridge |
+| `src/drone_bringup/launch/rover_showcase.launch.py` | Starts the showcase world and the ROS/Gazebo bridge |
 | `src/drone_bringup/launch/rover_navigation.launch.py` | Starts the saved map, AMCL, and Nav2 |
 | `src/drone_bringup/config/rover_nav.yaml` | Nav2 settings, including driving speed |
 | `src/drone_bringup/config/rover_mapping.yaml` | SLAM Toolbox settings used while mapping |
-| `src/drone_bringup/worlds/simple_room.sdf` | Main room and target marker |
+| `src/drone_bringup/worlds/showcase_house.sdf` | Showcase house world |
 | `src/drone_bringup/worlds/blocked_paths.sdf` | Optional blocked-detour test |
 | `src/drone_bringup/models/simple_rover/model.sdf` | Rover, wheels, LiDAR, and drive plugin |
 | `src/rover_control/rover_control/rover_go_to_target.py` | Earlier fixed-target controller |
-| `maps/simple_room.pgm` and `maps/simple_room.yaml` | Saved room map |
+| `maps/showcase_house_v5.pgm` and `maps/showcase_house_v5.yaml` | Saved showcase map used by Nav2 |
 
 ## What has been tested
 

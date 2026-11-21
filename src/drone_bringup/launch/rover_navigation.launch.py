@@ -12,7 +12,7 @@ def generate_launch_description():
     params_file = str(
         workspace / "src/drone_bringup/config/rover_nav.yaml"
     )
-    map_file = str(workspace / "maps/simple_room.yaml")
+    map_file = str(workspace / "maps/showcase_house_v5.yaml")
 
     nav2_launch_dir = (
         Path(get_package_share_directory("nav2_bringup")) / "launch"
